@@ -1,0 +1,7 @@
+<Configuration>
+    <Properties>
+        <ThreadCount>1</ThreadCount>
+
+    </Properties>
+
+</Configuration>
