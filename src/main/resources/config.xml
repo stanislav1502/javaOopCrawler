@@ -1,7 +1,14 @@
 <Configuration>
     <Properties>
-        <ThreadCount>1</ThreadCount>
-
+        <ThreadCount>1</ThreadCount> <!-- number of parallel searches -->
+        <DeathTimer>10</DeathTimer> <!-- time to live for each thread in seconds -->
     </Properties>
 
+    <Sites>
+        <Site>
+            <Name>JOBS BG</Name>
+            <URL>https://www.jobs.bg/front_job_search.php</URL>
+        </Site>
+
+    </Sites>
 </Configuration>
