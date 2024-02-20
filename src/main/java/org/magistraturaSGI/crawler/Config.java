@@ -5,12 +5,12 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
 import org.magistraturaSGI.crawler.dataobjects.Site;
+import org.magistraturaSGI.crawler.interfaces.IConfigurable;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
-
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -27,7 +27,7 @@ import java.util.logging.Logger;
  * Configuration class for the crawler, with getters and setters for various settings.
  */
 @Getter
-public class Config {
+public class Config implements IConfigurable {
     private static final Logger logger = Logger.getLogger(Config.class.getName());
 
     @Setter
@@ -47,7 +47,6 @@ public class Config {
 
     /**
      * Parameterized Config constructor for custom starting settings.
-     *
      * @param threads The number of threads.
      * @param timer   The time each thread lives for.
      * @param sites   The sites to be searched.

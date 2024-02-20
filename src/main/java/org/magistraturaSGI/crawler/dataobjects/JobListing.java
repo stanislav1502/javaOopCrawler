@@ -1,3 +1,4 @@
+
 package org.magistraturaSGI.crawler.dataobjects;
 
 import lombok.AllArgsConstructor;
@@ -8,6 +9,4 @@ import lombok.Getter;
 public class JobListing {
     private String title;
     private String url;
-
 }
-

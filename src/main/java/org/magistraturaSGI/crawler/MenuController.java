@@ -1,28 +1,32 @@
+
 package org.magistraturaSGI.crawler;
 
+import lombok.Getter;
 import org.magistraturaSGI.crawler.dataobjects.JobListing;
 import org.magistraturaSGI.crawler.dataobjects.Site;
+import org.magistraturaSGI.crawler.interfaces.IJobExporter;
+import org.magistraturaSGI.crawler.interfaces.INavigableConsoleMenu;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.net.URL;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Controller class for managing the menu and user interactions in the Crawler application.
  */
-public class MenuController {
+public class MenuController implements INavigableConsoleMenu, IJobExporter {
     private static final Logger logger = Logger.getLogger(MenuController.class.getName());
+    @Getter
     private static String menu = ""; // String to store the menu text
     private static final Crawler crawler = new Crawler(); // Crawler instance for fetching job listings
 
-    /**
-     * Main method to run the application.
-     * @param args Command line arguments (not used).
-     */
-    public static void main(String[] args)  {
-        logger.log(Level.INFO,"Program started.");
+    public static void main(String[] args) {
+        logger.log(Level.INFO, "Program started.");
         char key;
         System.out.println("\nNavigate through menus by typing the corresponding option number and pressing enter.\n");
         do {
@@ -30,14 +34,11 @@ public class MenuController {
             System.out.print("\033[H\033[2J");
 
             setStartMenuText();
-            System.out.println(menu);
+            System.out.println(getMenu());
 
-            try {
-                key = (char) System.in.read();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        } while (run(key));
+            System.out.flush();
+            key = new Scanner(System.in).next().trim().charAt(0);
+        } while (chooseOption(key));
     }
 
     /**
@@ -46,7 +47,7 @@ public class MenuController {
      * @param c The key pressed.
      * @return Default true.
      */
-    private static boolean run(char c) {
+    protected static boolean chooseOption(char c) {
         switch (c) {
             case '0': return false;
             case '1': startCrawler(); break;
@@ -61,18 +62,32 @@ public class MenuController {
      * Starts the crawler to fetch job listings from configured sites.
      */
     public static void startCrawler() {
-        logger.log(Level.INFO,"User selected menu option - Start Crawler");
+        logger.log(Level.INFO, "User selected menu option - Start Crawler");
         try {
+            crawler.addSitesToSearch();
             // Number of threads to run (adjust as needed)
             int numberOfThreads = crawler.getConfig().getThreadCount();
-            // Create and start multiple threads
+            // Create multiple threads
             List<Thread> threads = new ArrayList<>();
             for (int i = 0; i < numberOfThreads; i++) {
                 Thread thread = new Thread(crawler);
-                thread.start();
                 threads.add(thread);
-                logger.log(Level.INFO, "Started Crawler thread {0}", i + 1);
             }
+            // Start all threads
+            for (Thread thread : threads) {
+                thread.start();
+                logger.log(Level.INFO, "Started Crawler thread {0}", thread.threadId());
+            }
+            // Stop threads after death
+            Timer timer = new Timer("MenuTimer");
+            TimerTask stopThreads = new TimerTask() {
+                public void run() {
+                    threads.forEach(Thread::interrupt);
+                }
+            };
+            long delay = crawler.getConfig().getDeathTimer()* 1000L;
+            timer.schedule(stopThreads, delay);
+
             // Wait for all threads to finish
             for (Thread thread : threads) {
                 try {
@@ -83,6 +98,10 @@ public class MenuController {
                 }
             }
             logger.log(Level.INFO, "All Crawler threads have finished.");
+            // Fetch all job listings from the sites in the queue
+
+            crawler.findJobListings();
+            logger.log(Level.INFO, "Finished processing job listings.");
         } catch (Exception e) {
             logger.log(Level.SEVERE, "An unexpected error occurred in startCrawler", e);
         }
@@ -100,26 +119,26 @@ public class MenuController {
 
             Config config = crawler.getConfig();
             setConfigMenuText(config);
-            try {
-                key = (char) System.in.read();
-                switch (key) {
-                    case '1': {
-                        System.out.println("ThreadCount = ");
-                        int n = System.in.read();
-                        config.setThreadCount(n);
-                        logger.log(Level.INFO,"ThreadCount set to {0}",n);
-                    }
-                    break;
-                    case '2': {
-                        System.out.println("DeathTimer = ");
-                        int t = System.in.read();
-                        config.setDeathTimer(t);
-                        logger.log(Level.INFO,"DeathTimer set to {0}",t);
-                    }
-                    break;
+            System.out.println(menu);
+            System.out.flush();
+            key = new Scanner(System.in).next().charAt(0);
+            switch (key) {
+                case '1': {
+                    System.out.print("ThreadCount = ");
+                    System.out.flush();
+                    int n = Integer.parseInt(new Scanner(System.in).next());
+                    config.setThreadCount(n);
+                    logger.log(Level.INFO,"ThreadCount set to {0}",n);
                 }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+                break;
+                case '2': {
+                    System.out.print("DeathTimer = ");
+                    System.out.flush();
+                    int t = Integer.parseInt(new Scanner(System.in).next());
+                    config.setDeathTimer(t);
+                    logger.log(Level.INFO,"DeathTimer set to {0}",t);
+                }
+                break;
             }
         } while (key != '0');
         logger.log(Level.INFO,"Exited View Config menu");
@@ -138,12 +157,8 @@ public class MenuController {
             var sites = crawler.getConfig().getSiteList();
             setSitesMenuText(sites);
             System.out.println(menu);
-
-            try {
-                key = (char) System.in.read();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            System.out.flush();
+            key = new Scanner(System.in).next().charAt(0);
             int index = Integer.parseInt(String.valueOf(key)) - 1;
             if (0 <= index && index < sites.size() )
             {
@@ -165,24 +180,65 @@ public class MenuController {
             var jobs = crawler.getJobListings();
             setJobsMenuText(jobs, showAll);
             System.out.println(menu);
-
-            try {
-                key = (char) System.in.read();
-            } catch (IOException e) {
-                logger.log(Level.SEVERE, "Error reading user input.", e);
-                throw new RuntimeException(e);
-            }
-            if (key == '1') {
-                showAll = !showAll;
+            System.out.flush();
+            key = new Scanner(System.in).next().charAt(0);
+            switch (key) {
+                case '1': {
+                    showAll = !showAll;
+                    logger.log(Level.INFO, "ShowAllJobs set to {0}", showAll);
+                }
+                break;
+                case '2': {
+                    System.out.println("Export jobs as txt");
+                    File file = export(jobs);
+                    if (file != null) {
+                        logger.log(Level.INFO, "Jobs exported to: {0}", file.getAbsolutePath());
+                    }
+                }
+                break;
             }
         } while (key != '0');
-        logger.log(Level.INFO,"Exited View Jobs menu");
+        logger.log(Level.INFO, "Exited View Jobs menu");
+    }
+
+    /**
+     *
+     * @param list - the jobs to be exported
+     * @return the created file
+     */
+    public static File export(List<JobListing> list) {
+        // Create new file
+        URL path = Config.class.getClassLoader().getResource("config.xml");
+        if (path == null) {
+            logger.log(Level.SEVERE, "Could not find config.xml file.");
+            return null;
+        }
+        String newPath = path.getPath().replace("config.xml","jobOutput.txt");
+        File file = new File(newPath);
+        try {
+            if (!file.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                file.createNewFile();
+            }
+            // Write to file and close it
+            FileWriter fw = new FileWriter(file.getAbsoluteFile());
+            BufferedWriter bw = new BufferedWriter(fw);
+            String line;
+            for (JobListing job : list) {
+                line = "Title: " + job.getTitle() + " | Found at: " + job.getUrl()+"\n";
+                bw.write(line);
+            }
+            bw.close();
+        } catch (IOException e){
+            logger.log(Level.SEVERE, "An error occurred while writing to the file.", e);
+        }
+        return file;
     }
 
     /**
      * Sets the text for the start menu.
      */
-    private static void setStartMenuText(){
+    protected static void setStartMenuText(){
         menu  = ("\nCrawler Menu");
         menu += ("\n----------------------");
         menu += ("\n1 - Start Crawler");
@@ -222,27 +278,27 @@ public class MenuController {
         for (Site site : sites) {
             menu = menu.concat("\n" + ++i + " - [" + (site.isSearched() ? 'X' : ' ') + "] - " + site.getName());
         }
-        menu += ("---------------------------------");
+        menu += ("\n---------------------------------");
         menu += ("\nEnter the number of the site you want to switch searching on/off.");
         menu += ("\n0 - Back to Start Menu");
         logger.log(Level.INFO,"Set menu shown to be Sites menu");
     }
 
-    private static void setJobsMenuText(List<JobListing> jobs, boolean full){
+    private static void setJobsMenuText(List<JobListing> jobs, boolean showAll){
         menu  = ("\nJobs found");
         menu += ("\n--------------------------");
         menu += ("\nNumber of jobs = " + jobs.size());
         menu += ("\n--------------------------");
         menu += ("\n1 - Show all job listings");
+        menu += ("\n2 - Export job listings");
         menu += ("\n0 - Back to Start Menu");
         menu += ("\n--------------------------");
-        // Print all jobs to System.out
-        if (full){
+        // Will print all jobs
+        if (showAll){
             for (JobListing job : jobs) {
                 menu = menu.concat("Title: " + job.getTitle() + ", URL: " + job.getUrl());
             }
         }
-        logger.log(Level.INFO,"Set menu shown to be Jobs menu");
+        logger.log(Level.INFO,"Set menu shown to be Jobs menu, allJobs = {0}",showAll);
     }
-
 }

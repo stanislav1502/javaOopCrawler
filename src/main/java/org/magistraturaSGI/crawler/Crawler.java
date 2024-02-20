@@ -1,3 +1,4 @@
+
 package org.magistraturaSGI.crawler;
 
 import lombok.Getter;
@@ -8,11 +9,10 @@ import org.jsoup.select.Elements;
 import org.jsoup.select.Selector;
 import org.magistraturaSGI.crawler.dataobjects.JobListing;
 import org.magistraturaSGI.crawler.dataobjects.Site;
+import org.magistraturaSGI.crawler.interfaces.ISiteHandler;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
@@ -22,7 +22,7 @@ import java.util.logging.Logger;
  * Crawler class responsible for fetching job listings from various job search sites.
  */
 @Getter
-public class Crawler implements Runnable {
+public class Crawler implements Runnable, ISiteHandler {
     private static final Logger logger = Logger.getLogger(Crawler.class.getName());
     private final Config config; // Configuration settings for the crawler
     private  final List<JobListing> jobListings = new LinkedList<>(); // List to store job listings
@@ -137,6 +137,16 @@ public class Crawler implements Runnable {
         try {
             Site site;
             Document document;
+            final boolean[] stop = {false};
+            Timer timer = new Timer("ListingTimer");
+            TimerTask stopThread = new TimerTask()  {
+                public void run()  {
+                    stop[0] = true;
+                    notifyAll();
+                }
+            };
+            long delay = config.getDeathTimer()* 1000L;
+            timer.schedule(stopThread, delay);
             do {
                 site = sitesForSearching.poll();
                 if (site != null) {
@@ -147,6 +157,7 @@ public class Crawler implements Runnable {
                         return;
                     }
                     Elements jobLinks;
+                    setSiteSelectors(site);
                     try {
                         jobLinks = document.select(jobPageSelector);
                     } catch (Selector.SelectorParseException e) {
@@ -173,7 +184,7 @@ public class Crawler implements Runnable {
                         logger.log(Level.INFO, "Added job listing: {0}", newListing.getUrl());
                     }
                 }
-            } while (sitesForSearching.isEmpty());
+            } while (!sitesForSearching.isEmpty() && !stop[0]);
         } catch (Exception e) {
             logger.log(Level.SEVERE, "An unexpected error occurred", e);
         } finally {
@@ -205,9 +216,6 @@ public class Crawler implements Runnable {
                     logger.log(Level.INFO, "Found page links for site: {0}", site.getUrl());
                 }
             }
-            // Fetch all job listings from the sites in the queue
-            findJobListings();
-            logger.log(Level.INFO, "Finished processing job listings.");
         } catch (Exception e) {
             logger.log(Level.SEVERE, "An unexpected error occurred", e);
         }

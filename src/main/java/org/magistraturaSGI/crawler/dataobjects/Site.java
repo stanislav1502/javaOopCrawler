@@ -1,3 +1,4 @@
+
 package org.magistraturaSGI.crawler.dataobjects;
 
 import lombok.AllArgsConstructor;
