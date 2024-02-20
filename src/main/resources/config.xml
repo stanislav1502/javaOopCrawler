@@ -6,9 +6,22 @@
 
     <Sites>
         <Site>
-            <Name>JOBS BG</Name>
+            <Name>JOBS.BG</Name>
             <URL>https://www.jobs.bg/front_job_search.php</URL>
         </Site>
+        <Site>
+          <Name>OLX</Name>
+          <URL>https://www.olx.bg/rabota/</URL>
+        </Site>
+        <Site>
+            <Name>Yox</Name>
+            <URL>https://yox.bg/search?o=0&amp;q=&amp;k=j</URL>
+        </Site>
+        <Site>
+            <Name>RabotniMesta</Name>
+            <URL>https://www.rabotnimesta.bg/%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%B0/?&amp;p=1</URL>
+        </Site>
+
 
     </Sites>
 </Configuration>
